@@ -1,6 +1,6 @@
 ;*******************************************************************************
-;* Copyright (C) 2024 Analog Devices Inc. All Rights Reserved. This software is
-;* proprietary & confidential to Analog Devices, Inc. and its licensors.
+;* Copyright © 2024 Analog Devices Inc. All Rights Reserved.
+;* This software is proprietary to Analog Devices, Inc. and its licensors.
 ;*******************************************************************************
 ;   tamagawa t-format
 ;	author: GE, 2024-03-04
