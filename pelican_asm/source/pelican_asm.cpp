@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright © 2024 Analog Devices Inc. All Rights Reserved.
+* Copyright (C) 2024 Analog Devices Inc. All Rights Reserved.
 * This software is proprietary to Analog Devices, Inc. and its licensors.
 *******************************************************************************/
 
@@ -185,13 +185,13 @@ void PreProcessString(cSourceCodeLineList& codeList, cDefineList& defineList, cS
 			}
 			else if (sString == "else")
 			{
-				bSkipCodeLine = !bSkipCodeLine;
-				defineStack.SetSkipLine(bSkipCodeLine);
+				if (!defineStack.SetSkipLine(!bSkipCodeLine)) { std::cerr << "\"" << sFileName << "\" Error in line " << nLine << ": unexpected #else." << std::endl; nErrorCount++; }
+				else bSkipCodeLine = !bSkipCodeLine;
 			}
 			else if (sString == "endif")
 			{
 				if (!defineStack.Pop()) { std::cerr << "\"" << sFileName << "\" Error in line " << nLine << ": unexpected #endif." << std::endl; nErrorCount++; }
-				defineStack.GetSkipLine(bSkipCodeLine);
+				if (!defineStack.GetSkipLine(bSkipCodeLine)) { bSkipCodeLine = false; }
 			}
 			else if (!bSkipCodeLine)
 			{ 
@@ -237,7 +237,7 @@ int main(int argc, char** argv)
 	bool bGenerateROMFiles = false;
 	instructionList.SetMachine(MACHINE_TM02, "TM02");
 	std::cout << "Copyright (C) 2024 Analog Devices Inc. All Rights Reserved." << std::endl;
-	std::cout << "This software is proprietary & confidential to Analog Devices, Inc. and its licensors." << std::endl;
+	std::cout << "This software is proprietary to Analog Devices, Inc. and its licensors." << std::endl;
     std::cout << "pelican_asm: assembler for the pelican processor, version " << PELICAN_ASM_VERSION << std::endl;
 	std::cout << "(build: " << __DATE__ << " " << __TIME__ << ")" << std::endl;
 	int nArgument = 1;
@@ -660,8 +660,8 @@ int main(int argc, char** argv)
 			time_t currentTime = time(NULL);
 			ctime_s(sTime, 255, &currentTime);
 			cCodeFile << "/*******************************************************************************" << endl;
-			cCodeFile << "* Copyright (C) 2024 Analog Devices Inc. All Rights Reserved. This software is" << endl;
-			cCodeFile << "* proprietary & confidential to Analog Devices, Inc. and its licensors." << endl;
+			cCodeFile << "* Copyright (C) 2024 Analog Devices Inc. All Rights Reserved." << endl;
+			cCodeFile << "* This software is proprietary to Analog Devices, Inc. and its licensors." << endl;
 			cCodeFile << "********************************************************************************" << endl;
 			cCodeFile << "* This file has been generated automatically on " << sTime;
 			cCodeFile << "* Generator: pelican_asm.exe (build: " << __DATE__ << " " << __TIME__ << ")" << endl;
@@ -669,7 +669,7 @@ int main(int argc, char** argv)
 			cCodeFile << "* source file: \"" << sFileName << endl;
 			cCodeFile << "********************************************************************************" << endl;
 			cCodeFile << "* Notes:" << endl;
-			cCodeFile << "*   - The array nProgramCodeArray contains the TMC8100 program code starting" << endl;
+			cCodeFile << "*   - The array nProgramCodeArray contains the program code starting" << endl;
 			cCodeFile << "*     at program memory address zero with one byte per value / two bytes" << endl;
 			cCodeFile << "*     per instruction" << endl;
 			cCodeFile << "*   - Each instruction consists of two consecutive bytes in the array," << endl;
@@ -862,8 +862,8 @@ int main(int argc, char** argv)
 			time_t currentTime = time(NULL);
 			ctime_s(sTime, 255, &currentTime);
 			vhdlFile << "---------------------------------------------------------------------------------------" << endl;
-			vhdlFile << "-- Copyright (C) 2024 Analog Devices Inc. All Rights Reserved. This software is" << endl;
-			vhdlFile << "-- proprietary & confidential to Analog Devices, Inc. and its licensors." << endl;
+			vhdlFile << "-- Copyright (C) 2024 Analog Devices Inc. All Rights Reserved." << endl;
+			vhdlFile << "-- This software is proprietary to Analog Devices, Inc. and its licensors." << endl;
 			vhdlFile << "---------------------------------------------------------------------------------------" << endl;
 			vhdlFile << "-- This file has been generated automatically on " << sTime;
 			vhdlFile << "-- Generator: pelican_asm.exe (build: " << __DATE__ << " " << __TIME__ << ")" << endl;
