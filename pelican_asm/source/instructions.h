@@ -1,15 +1,7 @@
 /*******************************************************************************
-* Copyright © 2024 Analog Devices Inc. All Rights Reserved.
+* Copyright (C) 2024 Analog Devices Inc. All Rights Reserved.
 * This software is proprietary to Analog Devices, Inc. and its licensors.
 *******************************************************************************/
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// file: instructions.h
-// 
-// author: GE
-//
-////////////////////////////////////////////////////////////////////////////////
 
 #ifndef _INSTRUCTIONS_H_
 #define _INSTRUCTIONS_H_
@@ -18,8 +10,8 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 
-const int MACHINE_TM02 = 0x00000001;
-const int MACHINE_TM10 = 0x00000002;
+const int MACHINE_TMC8100 = 0x00000001;
+const int MACHINE_TMC6460 = 0x00000002;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -37,7 +29,7 @@ bool immediateData(uint16_t& nInstr, uint16_t nParameter);
 class cInstructionInfo
 {
 public:
-	cInstructionInfo() { nMachine = MACHINE_TM02;  pParam1 = 0; pParam2 = 0; pParam3 = 0; nCode = 0; pNext = 0; }
+	cInstructionInfo() { nMachine = MACHINE_TMC8100;  pParam1 = 0; pParam2 = 0; pParam3 = 0; nCode = 0; pNext = 0; }
 	~cInstructionInfo() { if (pNext) delete pNext; }
 	int nMachine;
 	cString sCmd;

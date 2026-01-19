@@ -1,15 +1,7 @@
 /*******************************************************************************
-* Copyright © 2024 Analog Devices Inc. All Rights Reserved.
+* Copyright (C) 2024 Analog Devices Inc. All Rights Reserved.
 * This software is proprietary to Analog Devices, Inc. and its licensors.
 *******************************************************************************/
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// file: identifiers.cpp
-// 
-// author: GE
-//
-////////////////////////////////////////////////////////////////////////////////
 
 #include "globals.h"
 #include "identifiers.h"
@@ -307,6 +299,7 @@ bool cDefineList::RemoveDefine(const cString& sName)
 		{
 			if (pDefinePrevious == 0) m_pDefineList = pDefine->m_pNext;
 			else pDefinePrevious = pDefine->m_pNext;
+			pDefine->m_pNext = 0;
 			delete pDefine;
 			return true;
 		}
@@ -334,53 +327,86 @@ bool cDefineList::GetDefine(const cString& sName, cString& sReplacementText)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+//
+// push next +ifdef, #ifndef or #else on stack
+// evaluate code block valid / not valid
+//
 
-bool cDefineStack::Push(const cString& sName, bool bSkipLine)
+bool cIfDefStack::Push(int nType, bool bBlockValid)
 {
-	cDefine* pDefine = new cDefine;
-	pDefine->m_sName = sName;
-	pDefine->m_bSkipLine = bSkipLine;
-	pDefine->m_sReplaceText = "";
-	pDefine->m_pNext = m_pTopOfStack;
-	m_pTopOfStack = pDefine;
+	cIfDef* pIfDef = new cIfDef;
+	pIfDef->m_nIfDefStackType = nType;
+	if (m_pTopOfStack)
+	{
+		if (nType == IF_DEF_STACK_IF)
+		{
+			// #ifdef, #ifndef
+			// any override due to nested #ifdef / #ifndef ?
+			if (m_pTopOfStack->m_bBlockValidEval == false) pIfDef->m_bBlockValidEval = false;
+			else pIfDef->m_bBlockValidEval = bBlockValid;
+			pIfDef->m_bBlockValid = bBlockValid;
+		}
+		else
+		{
+			// #else
+			if (m_pTopOfStack->m_bBlockValidEval == false) pIfDef->m_bBlockValidEval = false;
+			else pIfDef->m_bBlockValidEval = !m_pTopOfStack->m_bBlockValid;
+			pIfDef->m_bBlockValid = !m_pTopOfStack->m_bBlockValid;
+		}
+	}
+	else
+	{
+		pIfDef->m_bBlockValid = bBlockValid;
+		pIfDef->m_bBlockValidEval = bBlockValid;
+	}
+	// insert new stack entry
+	pIfDef->m_pNext = m_pTopOfStack;
+	m_pTopOfStack = pIfDef;
 	return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-bool cDefineStack::GetSkipLine(bool& bSkipLine)
-{
-	if (!m_pTopOfStack) return false;
-	bSkipLine = m_pTopOfStack->m_bSkipLine;
-	return false;
-}
+bool cIfDefStack::Push(int nType) { return Push(nType, true); }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-bool cDefineStack::SetSkipLine(const bool bSkipLine)
+bool cIfDefStack::IsBlockValid(void)
 {
-	if (!m_pTopOfStack) return false;
-	m_pTopOfStack->m_bSkipLine = bSkipLine;
-	return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-bool cDefineStack::IsStackEmpty(void)
-{
-	if (m_pTopOfStack) return false;
+	if (m_pTopOfStack) return m_pTopOfStack->m_bBlockValidEval;
 	return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-bool cDefineStack::Pop(void)
+int cIfDefStack::GetLastIfDef(void)
+{
+	if (m_pTopOfStack == 0) return IF_DEF_STACK_EMPTY;
+	return m_pTopOfStack->m_nIfDefStackType;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+bool cIfDefStack::Pop(void)
 {
 	if (m_pTopOfStack)
 	{
-		cDefine* pDefine = m_pTopOfStack;
+		cIfDef* pIfDef = m_pTopOfStack;
+		int m_nIfDefStackType = pIfDef->m_nIfDefStackType;
 		m_pTopOfStack = m_pTopOfStack->m_pNext;
-		delete pDefine;
+		pIfDef->m_pNext = 0;
+		delete pIfDef;
+		if (m_nIfDefStackType == IF_DEF_STACK_ELSE)
+		{
+			// in addtion to #else also remove #ifdef or #ifndef from stack
+			if (m_pTopOfStack)
+			{
+				pIfDef = m_pTopOfStack;
+				m_pTopOfStack = m_pTopOfStack->m_pNext;
+				pIfDef->m_pNext = 0;
+				delete pIfDef;
+			}
+		}
 		return true;
 	}
 	return false;

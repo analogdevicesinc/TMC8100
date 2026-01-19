@@ -1,15 +1,7 @@
 /*******************************************************************************
-* Copyright © 2024 Analog Devices Inc. All Rights Reserved.
+* Copyright (C) 2024 Analog Devices Inc. All Rights Reserved.
 * This software is proprietary to Analog Devices, Inc. and its licensors.
 *******************************************************************************/
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// file: globals.h
-// 
-// author: GE
-//
-////////////////////////////////////////////////////////////////////////////////
 
 #ifndef _GLOBALS_H_
 #define _GLOBALS_H_

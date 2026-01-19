@@ -1,15 +1,7 @@
 /*******************************************************************************
-* Copyright © 2024 Analog Devices Inc. All Rights Reserved.
+* Copyright (C) 2024 Analog Devices Inc. All Rights Reserved.
 * This software is proprietary to Analog Devices, Inc. and its licensors.
 *******************************************************************************/
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// file: pelican_asm.cpp
-// 
-// author: GE
-//
-////////////////////////////////////////////////////////////////////////////////
 
 #include "globals.h"
 #include "identifiers.h"
@@ -18,7 +10,7 @@
 #include <ctime>
 #include <iomanip>
 
-#define PELICAN_ASM_VERSION "1.0"
+#define PELICAN_ASM_VERSION "1.1"
 
 using namespace std;
 
@@ -26,22 +18,18 @@ using namespace std;
 
 void CommandLineHelp(void)
 {
-	std::cout << "pelican_asm.exe <file_name>[.asm] [-m|M TM02|TM10] [-i] [-l] [-c] [-rom] [-h]" << std::endl;
-	std::cout << "				  <file_name>[.asm]: input ASCII text file" << std::endl;
-	std::cout << "				     [-m TM02|TM10]: machine type - either TM02 (default) or TM10" << std::endl;
-	std::cout << "				               [-i]: generate intermediate / pre-processor output file" << std::endl;
-	std::cout << "				               [-l]: generate log file" << std::endl;
-	std::cout << "				               [-c]: generate c code file" << std::endl;
-	std::cout << "				             [-rom]: generate \"pelican_bootloader\" output files for simulation / FPGA / synthesis" << std::endl;
-	std::cout << "				               [-h]: help" << std::endl;
+	std::cout << "pelican_asm.exe <file_name>[.asm] [-m|M TMC8100|TMC6460] [-i] [-l] [-c] [-h]" << std::endl;
+	std::cout << "                <file_name>[.asm]: input ASCII text file" << std::endl;
+	std::cout << "             [-m TMC8100|TMC6460]: machine type - either TMC8100 (default) or TMC6460" << std::endl;
+	std::cout << "                             [-i]: generate intermediate / pre-processor output file" << std::endl;
+	std::cout << "                             [-l]: generate log file" << std::endl;
+	std::cout << "                             [-c]: generate C code file" << std::endl;
+	std::cout << "                             [-h]: help" << std::endl;
 	std::cout << "output files:" << std::endl;
-	std::cout << "  <file_name>.i (requires -i option): intermediate file - merged input files with all pre-processor commands #.. removed" << std::endl;
+	std::cout << "  <file_name>.hex: intel hex format file" << std::endl;
+	std::cout << "  <file_name>.i (requires -i): intermediate file - merged input files with all pre-processor commands #.. removed" << std::endl;
 	std::cout << "  <file_name>.log (requires -l): log file - input file contents + instruction code / memory address" << std::endl;
 	std::cout << "  <file_name>.c (requires -c): C language source file - C-array with instruction code" << std::endl;
-	std::cout << "  <file_name>.hex: intel hex format file" << std::endl;
-	std::cout << "  pelican_bootloader.hex: (requires -rom option) ROM hex format file - one line per instruction (16bit hex format)" << std::endl;
-	std::cout << "  pelican_bootloader.bin: (requires -rom option) ROM binary format file - one line per instruction (16bit binary format)" << std::endl;
-	std::cout << "  pelican_bootloader.vhd: (requires -rom option) vhdl file - vhdl entity logic replacement for ROM" << std::endl;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -49,9 +37,9 @@ void CommandLineHelp(void)
 void PreProcessString(cSourceCodeLineList& codeList, cDefineList& defineList, cString& sFileContents, int& nErrorCount)
 {
 	int nReply, nValue, nLine = 1;
-	cDefineStack defineStack;
-	bool bSkipCodeLine = false;
+	cIfDefStack ifDefStack;
 	bool bAddressLabel = false;
+	bool bCodeLineValid = true;
 	cString sLine, sString, sFileName;
 
 	// remember file name
@@ -59,6 +47,7 @@ void PreProcessString(cSourceCodeLineList& codeList, cDefineList& defineList, cS
 	sLine = "";
 	while (true)
 	{
+		bCodeLineValid = ifDefStack.IsBlockValid();
 		// search for pre-processor command starting with '#'
 		nReply = sFileContents.ParseNext(sString, nValue, nLine);
 		if (nReply == PARSER_END_OF_STRING) 
@@ -69,21 +58,21 @@ void PreProcessString(cSourceCodeLineList& codeList, cDefineList& defineList, cS
 				if (!bAddressLabel) sLine.Insert("  ", 0); // do some pretty printing
 				codeList.AddLine(sLine, nLine - 1);
 			}
-			if (!defineStack.IsStackEmpty()) { std::cerr << "\"" << sFileName << "\" Warning in line " << (nLine - 1) << ": #endif missing." << std::endl; }
+			if (ifDefStack.GetLastIfDef() != IF_DEF_STACK_EMPTY) { std::cerr << "\"" << sFileName << "\" Warning in line " << (nLine - 1) << ": #endif missing." << std::endl; }
 			return; 
 		}
-		else if (!bSkipCodeLine && (nReply == PARSER_STRING_QUOTATION_MARK)) { sLine.Append("\""); sLine.Append(sString); sLine.Append("\""); }
-		else if (!bSkipCodeLine && (nReply == PARSER_LEFT_PARENTHESIS)) sLine.Append("(");
-		else if (!bSkipCodeLine && (nReply == PARSER_RIGHT_PARENTHESIS)) sLine.Append(")");
-		else if (!bSkipCodeLine && (nReply == PARSER_RIGHT_PARENTHESIS)) sLine.Append(")");
-		else if (!bSkipCodeLine && (nReply == PARSER_EQUAL)) sLine.Append("=");
-		else if (!bSkipCodeLine && (nReply == PARSER_PLUS)) sLine.Append("+");
-		else if (!bSkipCodeLine && (nReply == PARSER_MINUS)) sLine.Append("-");
-		else if (!bSkipCodeLine && (nReply == PARSER_MUL)) sLine.Append("*");
-		else if (!bSkipCodeLine && (nReply == PARSER_DIV)) sLine.Append("/");
-		else if (!bSkipCodeLine && (nReply == PARSER_POWER)) sLine.Append("^");
-		else if (!bSkipCodeLine && (nReply == PARSER_COLON)) sLine.Append(":");
-		else if (!bSkipCodeLine && (nReply == PARSER_COMMA)) sLine.Append(",");
+		else if (bCodeLineValid && (nReply == PARSER_STRING_QUOTATION_MARK)) { sLine.Append("\""); sLine.Append(sString); sLine.Append("\""); }
+		else if (bCodeLineValid && (nReply == PARSER_LEFT_PARENTHESIS)) sLine.Append("(");
+		else if (bCodeLineValid && (nReply == PARSER_RIGHT_PARENTHESIS)) sLine.Append(")");
+		else if (bCodeLineValid && (nReply == PARSER_RIGHT_PARENTHESIS)) sLine.Append(")");
+		else if (bCodeLineValid && (nReply == PARSER_EQUAL)) sLine.Append("=");
+		else if (bCodeLineValid && (nReply == PARSER_PLUS)) sLine.Append("+");
+		else if (bCodeLineValid && (nReply == PARSER_MINUS)) sLine.Append("-");
+		else if (bCodeLineValid && (nReply == PARSER_MUL)) sLine.Append("*");
+		else if (bCodeLineValid && (nReply == PARSER_DIV)) sLine.Append("/");
+		else if (bCodeLineValid && (nReply == PARSER_POWER)) sLine.Append("^");
+		else if (bCodeLineValid && (nReply == PARSER_COLON)) sLine.Append(":");
+		else if (bCodeLineValid && (nReply == PARSER_COMMA)) sLine.Append(",");
 		else if (nReply == PARSER_HASH)
 		{
 			// pre processor command
@@ -92,7 +81,7 @@ void PreProcessString(cSourceCodeLineList& codeList, cDefineList& defineList, cS
 				std::cerr << "\"" << sFileName << "\" Error in line " << nLine << ": pre-processor command expected after '#'" << std::endl;
 				nErrorCount++;
 			}
-			else if (!bSkipCodeLine && (sString == "include"))
+			else if (bCodeLineValid && (sString == "include"))
 			{
 				cString sIncludeFileName, sIncludeFileContents;
 				if (sFileContents.ParseNext(sIncludeFileName, nValue, nLine) != PARSER_STRING_QUOTATION_MARK)
@@ -113,7 +102,7 @@ void PreProcessString(cSourceCodeLineList& codeList, cDefineList& defineList, cS
 					}
 				}
 			}
-			else if (!bSkipCodeLine && (sString == "define"))
+			else if (bCodeLineValid && (sString == "define"))
 			{
 				cString sIdentifier, sReplaceText(""), sReplacement;
 				if (sFileContents.ParseNext(sIdentifier, nValue, nLine) != PARSER_IDENTIFIER) { std::cerr << "\"" << sFileName << "\" Error in line " << nLine << ": identifer expected after pre-processor command #define" << std::endl; nErrorCount++; }
@@ -166,9 +155,7 @@ void PreProcessString(cSourceCodeLineList& codeList, cDefineList& defineList, cS
 				else
 				{
 					cString sDummy;
-					// check for any #define
-					if (defineList.GetDefine(sIdentifier, sDummy)) { defineStack.Push(sIdentifier, false); bSkipCodeLine = false; }
-					else { defineStack.Push(sIdentifier, true); bSkipCodeLine = true; }
+					ifDefStack.Push(IF_DEF_STACK_IF, defineList.GetDefine(sIdentifier, sDummy));
 				}
 			}
 			else if (sString == "ifndef")
@@ -178,22 +165,19 @@ void PreProcessString(cSourceCodeLineList& codeList, cDefineList& defineList, cS
 				else
 				{
 					cString sDummy;
-					// check for any #define
-					if (defineList.GetDefine(sIdentifier, sDummy)) { defineStack.Push(sIdentifier, true); bSkipCodeLine = true; }
-					else { defineStack.Push(sIdentifier, false); bSkipCodeLine = false; }
+					ifDefStack.Push(IF_DEF_STACK_IF, !defineList.GetDefine(sIdentifier, sDummy));
 				}
 			}
 			else if (sString == "else")
 			{
-				if (!defineStack.SetSkipLine(!bSkipCodeLine)) { std::cerr << "\"" << sFileName << "\" Error in line " << nLine << ": unexpected #else." << std::endl; nErrorCount++; }
-				else bSkipCodeLine = !bSkipCodeLine;
+				if (ifDefStack.GetLastIfDef() != IF_DEF_STACK_IF) { std::cerr << "\"" << sFileName << "\" Error in line " << nLine << ": unexpected #else." << std::endl; nErrorCount++; }
+				else ifDefStack.Push(IF_DEF_STACK_ELSE);
 			}
 			else if (sString == "endif")
 			{
-				if (!defineStack.Pop()) { std::cerr << "\"" << sFileName << "\" Error in line " << nLine << ": unexpected #endif." << std::endl; nErrorCount++; }
-				if (!defineStack.GetSkipLine(bSkipCodeLine)) { bSkipCodeLine = false; }
+				if (!ifDefStack.Pop()) { std::cerr << "\"" << sFileName << "\" Error in line " << nLine << ": unexpected #endif." << std::endl; nErrorCount++; }
 			}
-			else if (!bSkipCodeLine)
+			else if (bCodeLineValid)
 			{ 
 				std::cerr << "\"" << sFileName << "\" Error in line " << nLine << ": unknown pre-processor command" << std::endl; 
 				nErrorCount++; 
@@ -201,8 +185,8 @@ void PreProcessString(cSourceCodeLineList& codeList, cDefineList& defineList, cS
 
 			}
 		}
-		else if (!bSkipCodeLine && (nReply == PARSER_ADDRESS_LABEL)) { sLine.Append(" "); sLine += sString; sLine.Append(": "); bAddressLabel = true; }
-		else if (!bSkipCodeLine && (nReply == PARSER_IDENTIFIER))
+		else if (bCodeLineValid && (nReply == PARSER_ADDRESS_LABEL)) { sLine.Append(" "); sLine += sString; sLine.Append(": "); bAddressLabel = true; }
+		else if (bCodeLineValid && (nReply == PARSER_IDENTIFIER))
 		{
 			// check for any #define
 			cString sReplacement;
@@ -211,8 +195,8 @@ void PreProcessString(cSourceCodeLineList& codeList, cDefineList& defineList, cS
 			else sLine += sString;
 			sLine.Append(" ");
 		}
-		else if (!bSkipCodeLine && (nReply == PARSER_VALUE)) { sLine.Append(" $"); sLine.Append(nValue, 16, 0); sLine.Append(" "); }
-		else if (!bSkipCodeLine && (nReply == PARSER_UNKNOWN_CHAR)) { std::cerr << "\"" << sFileName << "\" Error in line " << nLine << ": unsupported char '" << (char)nValue << "'" << std::endl; nErrorCount++; }
+		else if (bCodeLineValid && (nReply == PARSER_VALUE)) { sLine.Append(" $"); sLine.Append(nValue, 16, 0); sLine.Append(" "); }
+		else if (bCodeLineValid && (nReply == PARSER_UNKNOWN_CHAR)) { std::cerr << "\"" << sFileName << "\" Error in line " << nLine << ": unsupported char '" << (char)nValue << "'" << std::endl; nErrorCount++; }
 		else if (nReply == PARSER_END_OF_LINE)
 		{
 			if (!sLine.IsEmpty()) 
@@ -235,16 +219,16 @@ int main(int argc, char** argv)
 	bool bGenerateLogFile = false;
 	bool bGenerateCFile = false;
 	bool bGenerateROMFiles = false;
-	instructionList.SetMachine(MACHINE_TM02, "TM02");
+	instructionList.SetMachine(MACHINE_TMC8100, "TMC8100");
 	std::cout << "Copyright (C) 2024 Analog Devices Inc. All Rights Reserved." << std::endl;
 	std::cout << "This software is proprietary to Analog Devices, Inc. and its licensors." << std::endl;
-    std::cout << "pelican_asm: assembler for the pelican processor, version " << PELICAN_ASM_VERSION << std::endl;
+    std::cout << "pelican_asm: assembler for the embedded pelican processor, version " << PELICAN_ASM_VERSION << std::endl;
 	std::cout << "(build: " << __DATE__ << " " << __TIME__ << ")" << std::endl;
 	int nArgument = 1;
 	bool bFileNameFound = false;
 	cString sFileName;
-	// default machine type is TM02
-	instructionList.SetMachine(MACHINE_TM02, "TM02");
+	// default machine type is TMC8100
+	instructionList.SetMachine(MACHINE_TMC8100, "TMC8100");
 	while (nArgument < argc)
 	{
 		if ((argv[nArgument][0] == '-') && (argv[nArgument][1] == 'i') && (argv[nArgument][2] == 0))
@@ -271,8 +255,8 @@ int main(int argc, char** argv)
 			if (nArgument < (argc - 1))
 			{
 				cString sArg(argv[nArgument]);
-				if (sArg.CompareNoCase("TM02")) instructionList.SetMachine(MACHINE_TM02, "TM02");
-				else if (sArg.CompareNoCase("TM10")) instructionList.SetMachine(MACHINE_TM10, "TM10");
+				if (sArg.CompareNoCase("TMC8100")) instructionList.SetMachine(MACHINE_TMC8100, "TMC8100");
+				else if (sArg.CompareNoCase("TMC6460")) instructionList.SetMachine(MACHINE_TMC6460, "TMC6460");
 				else
 				{
 					std::cerr << "Error: Unknown machine type \"" << argv[nArgument] << "\"" << std::endl;
@@ -786,7 +770,7 @@ int main(int argc, char** argv)
 				hexFile << endl;
 				nWords++;
 			}
-			if (instructionList.GetMachineName() == "TM02")
+			if (instructionList.GetMachineName() == "TMC8100")
 			{
 				while (nWords < 1024)
 				{
@@ -794,7 +778,7 @@ int main(int argc, char** argv)
 					nWords++;
 				}
 			}
-			else if (instructionList.GetMachineName() == "TM10")
+			else if (instructionList.GetMachineName() == "TMC6460")
 			{
 				while (nWords < 2048)
 				{
@@ -826,7 +810,7 @@ int main(int argc, char** argv)
 				binFile << endl;
 				nWords++;
 			}
-			if (instructionList.GetMachineName() == "TM02")
+			if (instructionList.GetMachineName() == "TMC8100")
 			{
 				while (nWords < 1024)
 				{
@@ -834,7 +818,7 @@ int main(int argc, char** argv)
 					nWords++;
 				}
 			}
-			else if (instructionList.GetMachineName() == "TM10")
+			else if (instructionList.GetMachineName() == "TMC6460")
 			{
 				while (nWords < 2048)
 				{

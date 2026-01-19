@@ -1,15 +1,7 @@
 /*******************************************************************************
-* Copyright © 2024 Analog Devices Inc. All Rights Reserved.
+* Copyright (C) 2024 Analog Devices Inc. All Rights Reserved.
 * This software is proprietary to Analog Devices, Inc. and its licensors.
 *******************************************************************************/
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// file: stack.h
-// 
-// author: GE
-//
-////////////////////////////////////////////////////////////////////////////////
 
 #ifndef _STACK_H_
 #define _STACK_H_

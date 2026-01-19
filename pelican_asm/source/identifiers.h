@@ -1,15 +1,7 @@
 /*******************************************************************************
-* Copyright © 2024 Analog Devices Inc. All Rights Reserved.
+* Copyright (C) 2024 Analog Devices Inc. All Rights Reserved.
 * This software is proprietary to Analog Devices, Inc. and its licensors.
 *******************************************************************************/
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// file: identifiers.h
-// 
-// author: GE
-//
-////////////////////////////////////////////////////////////////////////////////
 
 #ifndef _IDENTIFIERS_H_
 #define _IDENTIFIERS_H_
@@ -72,12 +64,13 @@ private:
 class cDefine
 {
 public:
-	cDefine() {
-		cString sEmpty; m_sName = sEmpty; m_sReplaceText = sEmpty; m_bSkipLine = false; }
+	cDefine() 
+	{
+		cString sEmpty; m_sName = sEmpty; m_sReplaceText = sEmpty; m_pNext = 0;
+	}
 	~cDefine() { if (m_pNext) delete m_pNext; m_pNext = 0; }
 	cString m_sName;
 	cString m_sReplaceText;
-	bool m_bSkipLine;
 	class cDefine* m_pNext;
 };
 
@@ -98,20 +91,42 @@ private:
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-// stack of #define
+// stack for #ifdef, #ifndef and #else
 
-class cDefineStack
+enum {
+	IF_DEF_STACK_EMPTY, IF_DEF_STACK_IF, IF_DEF_STACK_ELSE
+};
+
+////////////////////////////////////////////////////////////////////////////////
+
+class cIfDef
 {
 public:
-	cDefineStack() { m_pTopOfStack = 0; }
-	~cDefineStack() { if (m_pTopOfStack) { delete m_pTopOfStack; m_pTopOfStack = 0; } }
-	bool Push(const cString&, bool);
-	bool GetSkipLine(bool&);
-	bool SetSkipLine(bool);
-	bool IsStackEmpty(void);
+	cIfDef()
+	{
+		m_nIfDefStackType = IF_DEF_STACK_EMPTY; m_bBlockValid = true; m_bBlockValidEval = true; m_pNext = 0;
+	}
+	~cIfDef() { if (m_pNext) delete m_pNext; m_pNext = 0; }
+	int m_nIfDefStackType;
+	bool m_bBlockValid;
+	bool m_bBlockValidEval;
+	class cIfDef* m_pNext;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+
+class cIfDefStack
+{
+public:
+	cIfDefStack() { m_pTopOfStack = 0; }
+	~cIfDefStack() { if (m_pTopOfStack) { delete m_pTopOfStack; m_pTopOfStack = 0; } }
+	bool Push(int, bool);
+	bool Push(int);
+	bool IsBlockValid(void);
+	int GetLastIfDef(void);
 	bool Pop(void);
 private:
-	class cDefine* m_pTopOfStack;
+	class cIfDef* m_pTopOfStack;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
